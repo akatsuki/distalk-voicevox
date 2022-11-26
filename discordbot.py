@@ -1,6 +1,5 @@
 import asyncio
 from typing import Dict, List, Optional
-import aiohttp
 import discord
 from discord.ext import commands
 import os
@@ -12,7 +11,6 @@ import jaconv
 import cyrtranslit
 import pinyin
 import pycld2 as cld2
-from langdetect import detect
 from ko_pron import romanise
 from english_to_kana import EnglishToKana
 
