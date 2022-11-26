@@ -52,6 +52,21 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name=presence))
 
 
+async def ready_for_disconnect():
+    for g in bot.guilds:
+        if g.voice_client:
+            print(
+                f"disconnected voice channel from '{g.voice_client.channel}' at '{g.name}'")
+            await mp3_player(
+                "ここでお知らせです。プロジェクトに更新が入りましたので、Botは再起動を始めます。それでは、さようなら", g.voice_client, None)
+            await g.voice_client.disconnect(force=False)
+            await asyncio.sleep(5)
+            if g.voice_client:
+                await g.voice_client.disconnect(force=True)
+
+    await bot.change_presence(status=discord.Status.dnd, activity=discord.Game("now restarting..."))
+
+
 @bot.event
 async def on_guild_join(guild: discord.Guild):
     presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
