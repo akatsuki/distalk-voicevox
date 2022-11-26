@@ -273,11 +273,12 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
 
 @client.command(alias=["help", "h"])
 async def ヘルプ(ctx: commands.Context):
-    message = f'''◆◇◆{client.user.name}の使い方◆◇◆
-{prefix}＋コマンドで命令できます。
-{prefix}接続：ボイスチャンネルに接続します。
-{prefix}切断：ボイスチャンネルから切断します。'''
-    await ctx.send(message)
+    if client.user:
+        message = f"◆◇◆{client.user.name}の使い方◆◇◆\n" \
+            + f"{prefix}＋コマンドで命令できます。\n" \
+            + f"{prefix}接続：ボイスチャンネルに接続します。\n"\
+            + f"{prefix}切断：ボイスチャンネルから切断します。\n"
+        await ctx.send(message)
 
 if __name__ == "__main__":
     client.run(token)
