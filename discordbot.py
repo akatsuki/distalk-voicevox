@@ -123,7 +123,8 @@ def text_converter(text: str, message: Optional[discord.Message] = None, now_aut
     text = re.sub(r'[\U0000FE00-\U0000FE0F]', '', text)
     text = re.sub(r'[\U0001F3FB-\U0001F3FF]', '', text)
     for char in text:
-        if char in emoji.UNICODE_EMOJI['en'] and char in emoji_dataset:
+        # if char in emoji.UNICODE_EMOJI['en'] and char in emoji_dataset:
+        if emoji.is_emoji(char) and char in emoji_dataset:
             text = text.replace(char, emoji_dataset[char]['short_name'])
 
     # Replace Discord emoji
