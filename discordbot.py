@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import discord
 from discord.ext import commands
 import os
@@ -113,7 +113,8 @@ def text_converter(text: str, message: Optional[discord.Message] = None, now_aut
             text = message.author.display_name + '、' + text
 
         # Replace mention to user
-        user_mentions: List[discord.Member] = message.mentions
+        user_mentions: List[Union[discord.Member,
+                                  discord.User]] = message.mentions
         for um in user_mentions:
             text = text.replace(
                 f"<@{um.id}>", f"、{um.display_name}さんへのメンション")
