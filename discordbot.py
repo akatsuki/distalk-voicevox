@@ -318,7 +318,7 @@ if __name__ == "__main__":
 
         async def exiting(signame):
             print(f"got {signame};")
-            print(f"canceling all tasks...")
+            print("canceling all tasks...")
             for task in bot_tasks:
                 try:
                     task.cancel()
