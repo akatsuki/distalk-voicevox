@@ -1,7 +1,7 @@
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
 import traceback
 import re
@@ -13,9 +13,11 @@ import pinyin
 import pycld2 as cld2
 from ko_pron import romanise
 from english_to_kana import EnglishToKana
+import signal
 
 DEBUG = False
 pastauthor: Dict[int, discord.abc.User] = {}
+bot_tasks: List[tasks.Loop] = []
 
 if not DEBUG:
     pass
@@ -32,7 +34,7 @@ else:
 # intents = discord.Intents(all=True)
 intents = discord.Intents.default()
 intents.message_content = True
-client = commands.Bot(command_prefix=prefix, intents=intents)
+bot = commands.Bot(command_prefix=prefix, intents=intents)
 with open('emoji_ja.json', encoding='utf-8') as file:
     emoji_dataset = json.load(file)
 with open("data/ignore_users.json", "r", encoding="utf-8") as f:
@@ -42,29 +44,54 @@ with open("data/ignore_users.json", "r", encoding="utf-8") as f:
 ETK = EnglishToKana()
 
 
-@client.event
+@bot.event
 async def on_ready():
-    if client.user is None:
+    if bot.user is None:
         raise Exception("seems failed to login")
 
-    print('Logged in as ' + client.user.name)
-    presence = f'{prefix}ヘルプ | 0/{len(client.guilds)}サーバー'
-    await client.change_presence(activity=discord.Game(name=presence))
+    print('Logged in as ' + bot.user.name)
+    presence = f'{prefix}ヘルプ | 0/{len(bot.guilds)}サーバー'
+    await bot.change_presence(activity=discord.Game(name=presence))
 
 
-@client.event
+@commands.is_owner()
+@bot.command()
+async def shutdown(ctx: Optional[commands.Context] = None):
+    if ctx:
+        await ctx.send("shutdown the bot...")
+    print("shutdown bot...")
+    await ready_for_disconnect()
+    await bot.close()
+
+
+async def ready_for_disconnect():
+    for g in bot.guilds:
+        if g.voice_client:
+            print(
+                f"disconnected voice channel from '{g.voice_client.channel}' at '{g.name}'")
+            await mp3_player(
+                "ここでお知らせです。プロジェクトに更新が入りましたので、Botは再起動を始めます。それでは、さようなら", g.voice_client, None)
+            await g.voice_client.disconnect(force=False)
+            await asyncio.sleep(5)
+            if g.voice_client:
+                await g.voice_client.disconnect(force=True)
+
+    await bot.change_presence(status=discord.Status.dnd, activity=discord.Game("now restarting..."))
+
+
+@bot.event
 async def on_guild_join(guild: discord.Guild):
-    presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-    await client.change_presence(activity=discord.Game(name=presence))
+    presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+    await bot.change_presence(activity=discord.Game(name=presence))
 
 
-@client.event
+@bot.event
 async def on_guild_remove(guild: discord.Guild):
-    presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-    await client.change_presence(activity=discord.Game(name=presence))
+    presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+    await bot.change_presence(activity=discord.Game(name=presence))
 
 
-@client.command(alias=["connect", "con"])
+@bot.command(alias=["connect", "con"])
 async def 接続(ctx: commands.Context):
     if ctx.message.guild is not None and isinstance(ctx.author, discord.Member):
         if ctx.author.voice is None:
@@ -83,7 +110,7 @@ async def 接続(ctx: commands.Context):
                     await ctx.author.voice.channel.connect()
 
 
-@client.command(alias=["disconnect", "discon", "dis"])
+@bot.command(alias=["disconnect", "discon", "dis"])
 async def 切断(ctx: commands.Context):
     if ctx.message.guild:
         if ctx.voice_client is None:
@@ -113,7 +140,8 @@ def text_converter(text: str, message: Optional[discord.Message] = None, now_aut
             text = message.author.display_name + '、' + text
 
         # Replace mention to user
-        user_mentions: List[discord.Member] = message.mentions
+        user_mentions: List[Union[discord.Member,
+                                  discord.User]] = message.mentions
         for um in user_mentions:
             text = text.replace(
                 f"<@{um.id}>", f"、{um.display_name}さんへのメンション")
@@ -176,7 +204,7 @@ def text_converter(text: str, message: Optional[discord.Message] = None, now_aut
         etk_text = ETK.convert(text)
         a2k_text = jaconv.alphabet2kana(text)
         text = jaconv.alphabet2kana(etk_text.lower())
-        #text = romanise(text, "rr")
+        # text = romanise(text, "rr")
 
     text = jaconv.alphabet2kana(text)
     print(" -> ", text, f" (detected langcode: {detected_lang})")
@@ -199,62 +227,70 @@ async def mp3_player(text: str, voice_client: discord.VoiceClient, message: Opti
             await message.reply(f"エラーが発生したので再生をストップしました、ごめんなさい！ ><\n```\n{e.strerror}\n```")
 
 
-@client.event
+@bot.event
 async def on_message(message: discord.Message):
-    if message.guild.voice_client:
-        if not message.author.bot and message.author.id not in ignore_users["user_ids"]:
-            if not message.content.startswith(prefix) and message.author.guild.voice_client:
-                author = None
-                if message.guild.id not in pastauthor.keys() or pastauthor[message.guild.id] == message.author:
-                    pastauthor[message.guild.id] = message.author
-                    author = message.author
+    if message.guild:  # if message is sent in guild
+        if message.guild.voice_client:  # if bot is in voice channel
+            if isinstance(message.author, discord.Member) and not message.author.bot and message.author.id not in ignore_users["user_ids"]:
+                if not message.content.startswith(prefix) and message.author.guild.voice_client:
+                    author: Optional[discord.Member] = None
+                    if message.guild.id not in pastauthor.keys() or pastauthor[message.guild.id] == message.author:
+                        pastauthor[message.guild.id] = message.author
+                        author = message.author
 
-                text = message.content
-                text = text_converter(text, message, author)
-                await mp3_player(text, message.guild.voice_client)
-    await client.process_commands(message)
+                    text = message.content
+                    text = text_converter(text, message, author)
+                    await mp3_player(text, message.guild.voice_client)
+    await bot.process_commands(message)
 
 
-@client.event
+@bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-    if before.channel is None:
-        if member.id == client.user.id:
-            presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-            await client.change_presence(activity=discord.Game(name=presence))
+    if before.channel is None and bot.user:
+        if member.id == bot.user.id:
+            presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+            await bot.change_presence(activity=discord.Game(name=presence))
         else:
             if member.guild.voice_client is None:
                 await asyncio.sleep(0.5)
-                await after.channel.connect()
+                if after.channel is not None:
+                    await after.channel.connect()
             else:
-                if member.guild.voice_client.channel is after.channel:
-                    text = member.display_name + 'さんが入室しました'
-                    text = text_converter(text)
-                    await mp3_player(text, member.guild.voice_client)
-    elif after.channel is None:
-        if member.id == client.user.id:
-            presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-            await client.change_presence(activity=discord.Game(name=presence))
-        else:
-            if member.guild.voice_client:
-                if member.guild.voice_client.channel is before.channel:
-                    if len(member.guild.voice_client.channel.members) == 1:
-                        await asyncio.sleep(0.5)
-                        await member.guild.voice_client.disconnect()
-                    else:
-                        text = member.display_name + 'さんが退室しました'
+                voice_channel = member.guild.voice_client.channel
+                if isinstance(voice_channel, discord.VoiceChannel):
+                    if voice_channel is after.channel:
+                        text = member.display_name + 'さんが入室しました'
                         text = text_converter(text)
                         await mp3_player(text, member.guild.voice_client)
+    elif after.channel is None:
+        if member.id == bot.user.id:
+            presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+            await bot.change_presence(activity=discord.Game(name=presence))
+        else:
+            if member.guild.voice_client:
+                voice_channel = member.guild.voice_client.channel
+                if isinstance(voice_channel, discord.VoiceChannel):
+                    if voice_channel is before.channel:
+                        if len(voice_channel.members) == 1:
+                            await asyncio.sleep(0.5)
+                            await member.guild.voice_client.disconnect(force=False)
+                        else:
+                            text = member.display_name + 'さんが退室しました'
+                            text = text_converter(text)
+                            await mp3_player(text, member.guild.voice_client)
     elif before.channel != after.channel:
         if member.guild.voice_client:
-            if member.guild.voice_client.channel is before.channel:
-                if len(member.guild.voice_client.channel.members) == 1 or member.voice.self_mute:
-                    await asyncio.sleep(0.5)
-                    await member.guild.voice_client.disconnect()
-                    await asyncio.sleep(0.5)
-                    await after.channel.connect()
+            voice_channel = member.guild.voice_client.channel
+            if isinstance(voice_channel, discord.VoiceChannel):
+                if voice_channel is before.channel:
+                    if len(voice_channel.members) == 1 or (member.voice and member.voice.self_mute):
+                        await asyncio.sleep(0.5)
+                        await member.guild.voice_client.disconnect(force=False)
+                        await asyncio.sleep(0.5)
+                        await after.channel.connect()
 
 
-@client.event
+@bot.event
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     orig_error = getattr(error, 'original', error)
     error_msg = ''.join(
@@ -262,13 +298,42 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     await ctx.send(error_msg)
 
 
-@client.command(alias=["help", "h"])
+@bot.command(alias=["help", "h"])
 async def ヘルプ(ctx: commands.Context):
-    message = f'''◆◇◆{client.user.name}の使い方◆◇◆
-{prefix}＋コマンドで命令できます。
-{prefix}接続：ボイスチャンネルに接続します。
-{prefix}切断：ボイスチャンネルから切断します。'''
-    await ctx.send(message)
+    if bot.user:
+        message = f"◆◇◆{bot.user.name}の使い方◆◇◆\n" \
+            + f"{prefix}＋コマンドで命令できます。\n" \
+            + f"{prefix}接続：ボイスチャンネルに接続します。\n"\
+            + f"{prefix}切断：ボイスチャンネルから切断します。\n"
+        await ctx.send(message)
 
 if __name__ == "__main__":
-    client.run(token)
+    # bot.run(token)
+
+    print("starting...")
+    # dotenv.load_dotenv(".env")
+
+    if token:
+        loop = bot.loop
+
+        async def exiting(signame):
+            print(f"got {signame};")
+            print("canceling all tasks...")
+            for task in bot_tasks:
+                try:
+                    task.cancel()
+                except asyncio.CancelledError:
+                    print("cancelled error happend. ignoring it.")
+                    pass
+            # print(f"shutdown now...")
+            await shutdown()  # type: ignore
+        for signame in ('SIGINT', 'SIGTERM'):
+            loop.add_signal_handler(getattr(signal, signame),
+                                    lambda: asyncio.ensure_future(exiting(signame)))
+        try:
+            loop.run_until_complete(bot.start(token))
+        finally:
+            loop.close()
+        print("stopping...")
+    else:
+        raise Exception("token is not set.")
