@@ -1,6 +1,5 @@
 import asyncio
 from typing import Dict, List, Optional
-import aiohttp
 import discord
 from discord.ext import commands
 import os
@@ -12,7 +11,6 @@ import jaconv
 import cyrtranslit
 import pinyin
 import pycld2 as cld2
-from langdetect import detect
 from ko_pron import romanise
 from english_to_kana import EnglishToKana
 
@@ -31,7 +29,9 @@ else:
     voicevox_key = os.environ['GEKKA_VOICEVOX_KEY']
     voicevox_speaker = "2"
 
-intents = discord.Intents(all=True)
+# intents = discord.Intents(all=True)
+intents = discord.Intents.default()
+intents.message_content = True
 client = commands.Bot(command_prefix=prefix, intents=intents)
 with open('emoji_ja.json', encoding='utf-8') as file:
     emoji_dataset = json.load(file)
