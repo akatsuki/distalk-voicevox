@@ -52,6 +52,16 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name=presence))
 
 
+@commands.is_owner()
+@bot.command()
+async def shutdown(ctx: Optional[commands.Context] = None):
+    if ctx:
+        await ctx.send("shutdown the bot...")
+    print("shutdown bot...")
+    await ready_for_disconnect()
+    await bot.close()
+
+
 async def ready_for_disconnect():
     for g in bot.guilds:
         if g.voice_client:
