@@ -44,6 +44,9 @@ ETK = EnglishToKana()
 
 @client.event
 async def on_ready():
+    if client.user is None:
+        raise Exception("seems failed to login")
+
     print('Logged in as ' + client.user.name)
     presence = f'{prefix}ヘルプ | 0/{len(client.guilds)}サーバー'
     await client.change_presence(activity=discord.Game(name=presence))
