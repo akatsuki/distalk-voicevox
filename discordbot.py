@@ -202,17 +202,18 @@ async def mp3_player(text: str, voice_client: discord.VoiceClient, message: Opti
 
 @client.event
 async def on_message(message: discord.Message):
-    if message.guild.voice_client:
-        if not message.author.bot and message.author.id not in ignore_users["user_ids"]:
-            if not message.content.startswith(prefix) and message.author.guild.voice_client:
-                author = None
-                if message.guild.id not in pastauthor.keys() or pastauthor[message.guild.id] == message.author:
-                    pastauthor[message.guild.id] = message.author
-                    author = message.author
+    if message.guild:  # if message is sent in guild
+        if message.guild.voice_client:  # if bot is in voice channel
+            if isinstance(message.author, discord.Member) and not message.author.bot and message.author.id not in ignore_users["user_ids"]:
+                if not message.content.startswith(prefix) and message.author.guild.voice_client:
+                    author: Optional[discord.Member] = None
+                    if message.guild.id not in pastauthor.keys() or pastauthor[message.guild.id] == message.author:
+                        pastauthor[message.guild.id] = message.author
+                        author = message.author
 
-                text = message.content
-                text = text_converter(text, message, author)
-                await mp3_player(text, message.guild.voice_client)
+                    text = message.content
+                    text = text_converter(text, message, author)
+                    await mp3_player(text, message.guild.voice_client)
     await client.process_commands(message)
 
 
