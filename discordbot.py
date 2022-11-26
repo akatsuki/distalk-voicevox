@@ -197,7 +197,7 @@ async def mp3_player(text: str, voice_client: discord.VoiceClient, message: Opti
 @client.event
 async def on_message(message: discord.Message):
     if message.guild.voice_client:
-        if not message.author.bot and message.author.id not in ignore_users:
+        if not message.author.bot and message.author.id not in ignore_users["user_ids"]:
             if not message.content.startswith(prefix) and message.author.guild.voice_client:
                 author = None
                 if message.guild.id not in pastauthor.keys() or pastauthor[message.guild.id] == message.author:
