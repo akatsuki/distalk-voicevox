@@ -89,7 +89,7 @@ async def 切断(ctx: commands.Context):
         if ctx.voice_client is None:
             await ctx.send('ボイスチャンネルに接続していません。')
         else:
-            await ctx.voice_client.disconnect()
+            await ctx.voice_client.disconnect(force=False)
 
 
 def text_converter(text: str, message: Optional[discord.Message] = None, now_author: Optional[discord.Member] = None) -> str:
