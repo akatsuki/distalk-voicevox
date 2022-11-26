@@ -1,7 +1,3 @@
-import pathlib
-import re
-
-
 class ipa2Kana:
 
     def __init__(self):
