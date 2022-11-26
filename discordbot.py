@@ -63,19 +63,21 @@ async def on_guild_remove(guild: discord.Guild):
 
 @client.command(alias=["connect", "con"])
 async def 接続(ctx: commands.Context):
-    if ctx.message.guild:
+    if ctx.message.guild is not None and isinstance(ctx.author, discord.Member):
         if ctx.author.voice is None:
             await ctx.send('ボイスチャンネルに接続してから呼び出してください。')
         else:
-            if ctx.guild.voice_client:
-                if ctx.author.voice.channel == ctx.guild.voice_client.channel:
+            if ctx.message.guild.voice_client:
+                if ctx.author.voice.channel == ctx.message.guild.voice_client.channel:
                     await ctx.send('接続済みです。')
                 else:
-                    await ctx.voice_client.disconnect()
-                    await asyncio.sleep(0.5)
-                    await ctx.author.voice.channel.connect()
+                    if ctx.author.voice.channel is not None and ctx.voice_client:
+                        await ctx.voice_client.disconnect(force=True)
+                        await asyncio.sleep(0.5)
+                        await ctx.author.voice.channel.connect()
             else:
-                await ctx.author.voice.channel.connect()
+                if ctx.author.voice.channel is not None:
+                    await ctx.author.voice.channel.connect()
 
 
 @client.command(alias=["disconnect", "discon", "dis"])
