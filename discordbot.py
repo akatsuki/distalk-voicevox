@@ -1,7 +1,7 @@
 import asyncio
 from typing import Dict, List, Optional, Union
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
 import traceback
 import re
@@ -13,9 +13,11 @@ import pinyin
 import pycld2 as cld2
 from ko_pron import romanise
 from english_to_kana import EnglishToKana
+import signal
 
 DEBUG = False
 pastauthor: Dict[int, discord.abc.User] = {}
+bot_tasks: List[tasks.Loop] = []
 
 if not DEBUG:
     pass
@@ -306,4 +308,32 @@ async def ヘルプ(ctx: commands.Context):
         await ctx.send(message)
 
 if __name__ == "__main__":
-    bot.run(token)
+    # bot.run(token)
+
+    print("starting...")
+    # dotenv.load_dotenv(".env")
+
+    if token:
+        loop = bot.loop
+
+        async def exiting(signame):
+            print(f"got {signame};")
+            print(f"canceling all tasks...")
+            for task in bot_tasks:
+                try:
+                    task.cancel()
+                except asyncio.CancelledError:
+                    print("cancelled error happend. ignoring it.")
+                    pass
+            # print(f"shutdown now...")
+            await shutdown()  # type: ignore
+        for signame in ('SIGINT', 'SIGTERM'):
+            loop.add_signal_handler(getattr(signal, signame),
+                                    lambda: asyncio.ensure_future(exiting(signame)))
+        try:
+            loop.run_until_complete(bot.start(token))
+        finally:
+            loop.close()
+        print("stopping...")
+    else:
+        raise Exception("token is not set.")
