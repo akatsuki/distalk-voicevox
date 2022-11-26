@@ -32,7 +32,7 @@ else:
 # intents = discord.Intents(all=True)
 intents = discord.Intents.default()
 intents.message_content = True
-client = commands.Bot(command_prefix=prefix, intents=intents)
+bot = commands.Bot(command_prefix=prefix, intents=intents)
 with open('emoji_ja.json', encoding='utf-8') as file:
     emoji_dataset = json.load(file)
 with open("data/ignore_users.json", "r", encoding="utf-8") as f:
@@ -42,29 +42,29 @@ with open("data/ignore_users.json", "r", encoding="utf-8") as f:
 ETK = EnglishToKana()
 
 
-@client.event
+@bot.event
 async def on_ready():
-    if client.user is None:
+    if bot.user is None:
         raise Exception("seems failed to login")
 
-    print('Logged in as ' + client.user.name)
-    presence = f'{prefix}ヘルプ | 0/{len(client.guilds)}サーバー'
-    await client.change_presence(activity=discord.Game(name=presence))
+    print('Logged in as ' + bot.user.name)
+    presence = f'{prefix}ヘルプ | 0/{len(bot.guilds)}サーバー'
+    await bot.change_presence(activity=discord.Game(name=presence))
 
 
-@client.event
+@bot.event
 async def on_guild_join(guild: discord.Guild):
-    presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-    await client.change_presence(activity=discord.Game(name=presence))
+    presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+    await bot.change_presence(activity=discord.Game(name=presence))
 
 
-@client.event
+@bot.event
 async def on_guild_remove(guild: discord.Guild):
-    presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-    await client.change_presence(activity=discord.Game(name=presence))
+    presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+    await bot.change_presence(activity=discord.Game(name=presence))
 
 
-@client.command(alias=["connect", "con"])
+@bot.command(alias=["connect", "con"])
 async def 接続(ctx: commands.Context):
     if ctx.message.guild is not None and isinstance(ctx.author, discord.Member):
         if ctx.author.voice is None:
@@ -83,7 +83,7 @@ async def 接続(ctx: commands.Context):
                     await ctx.author.voice.channel.connect()
 
 
-@client.command(alias=["disconnect", "discon", "dis"])
+@bot.command(alias=["disconnect", "discon", "dis"])
 async def 切断(ctx: commands.Context):
     if ctx.message.guild:
         if ctx.voice_client is None:
@@ -177,7 +177,7 @@ def text_converter(text: str, message: Optional[discord.Message] = None, now_aut
         etk_text = ETK.convert(text)
         a2k_text = jaconv.alphabet2kana(text)
         text = jaconv.alphabet2kana(etk_text.lower())
-        #text = romanise(text, "rr")
+        # text = romanise(text, "rr")
 
     text = jaconv.alphabet2kana(text)
     print(" -> ", text, f" (detected langcode: {detected_lang})")
@@ -200,7 +200,7 @@ async def mp3_player(text: str, voice_client: discord.VoiceClient, message: Opti
             await message.reply(f"エラーが発生したので再生をストップしました、ごめんなさい！ ><\n```\n{e.strerror}\n```")
 
 
-@client.event
+@bot.event
 async def on_message(message: discord.Message):
     if message.guild:  # if message is sent in guild
         if message.guild.voice_client:  # if bot is in voice channel
@@ -214,15 +214,15 @@ async def on_message(message: discord.Message):
                     text = message.content
                     text = text_converter(text, message, author)
                     await mp3_player(text, message.guild.voice_client)
-    await client.process_commands(message)
+    await bot.process_commands(message)
 
 
-@client.event
+@bot.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-    if before.channel is None and client.user:
-        if member.id == client.user.id:
-            presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-            await client.change_presence(activity=discord.Game(name=presence))
+    if before.channel is None and bot.user:
+        if member.id == bot.user.id:
+            presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+            await bot.change_presence(activity=discord.Game(name=presence))
         else:
             if member.guild.voice_client is None:
                 await asyncio.sleep(0.5)
@@ -236,9 +236,9 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
                         text = text_converter(text)
                         await mp3_player(text, member.guild.voice_client)
     elif after.channel is None:
-        if member.id == client.user.id:
-            presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
-            await client.change_presence(activity=discord.Game(name=presence))
+        if member.id == bot.user.id:
+            presence = f'{prefix}ヘルプ | {len(bot.voice_clients)}/{len(bot.guilds)}サーバー'
+            await bot.change_presence(activity=discord.Game(name=presence))
         else:
             if member.guild.voice_client:
                 voice_channel = member.guild.voice_client.channel
@@ -263,7 +263,7 @@ async def on_voice_state_update(member: discord.Member, before: discord.VoiceSta
                         await after.channel.connect()
 
 
-@client.event
+@bot.event
 async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     orig_error = getattr(error, 'original', error)
     error_msg = ''.join(
@@ -271,14 +271,14 @@ async def on_command_error(ctx: commands.Context, error: commands.CommandError):
     await ctx.send(error_msg)
 
 
-@client.command(alias=["help", "h"])
+@bot.command(alias=["help", "h"])
 async def ヘルプ(ctx: commands.Context):
-    if client.user:
-        message = f"◆◇◆{client.user.name}の使い方◆◇◆\n" \
+    if bot.user:
+        message = f"◆◇◆{bot.user.name}の使い方◆◇◆\n" \
             + f"{prefix}＋コマンドで命令できます。\n" \
             + f"{prefix}接続：ボイスチャンネルに接続します。\n"\
             + f"{prefix}切断：ボイスチャンネルから切断します。\n"
         await ctx.send(message)
 
 if __name__ == "__main__":
-    client.run(token)
+    bot.run(token)
