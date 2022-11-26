@@ -314,9 +314,11 @@ if __name__ == "__main__":
     # dotenv.load_dotenv(".env")
 
     if token:
-        loop = bot.loop
+        loop = asyncio.get_event_loop()
+        # loop = bot.loop
 
-        async def exiting(signame):
+        async def handler(signum, frame):
+            signame = signal.Signals(signum).name
             print(f"got {signame};")
             print("canceling all tasks...")
             for task in bot_tasks:
@@ -325,11 +327,11 @@ if __name__ == "__main__":
                 except asyncio.CancelledError:
                     print("cancelled error happend. ignoring it.")
                     pass
-            # print(f"shutdown now...")
             await shutdown()  # type: ignore
+
         for signame in ('SIGINT', 'SIGTERM'):
             loop.add_signal_handler(getattr(signal, signame),
-                                    lambda: asyncio.ensure_future(exiting(signame)))
+                                    lambda signum, frame: asyncio.ensure_future(handler(signum, frame)))
         try:
             loop.run_until_complete(bot.start(token))
         finally:
