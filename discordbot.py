@@ -219,41 +219,48 @@ async def on_message(message: discord.Message):
 
 @client.event
 async def on_voice_state_update(member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
-    if before.channel is None:
+    if before.channel is None and client.user:
         if member.id == client.user.id:
             presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
             await client.change_presence(activity=discord.Game(name=presence))
         else:
             if member.guild.voice_client is None:
                 await asyncio.sleep(0.5)
-                await after.channel.connect()
+                if after.channel is not None:
+                    await after.channel.connect()
             else:
-                if member.guild.voice_client.channel is after.channel:
-                    text = member.display_name + 'さんが入室しました'
-                    text = text_converter(text)
-                    await mp3_player(text, member.guild.voice_client)
+                voice_channel = member.guild.voice_client.channel
+                if isinstance(voice_channel, discord.VoiceChannel):
+                    if voice_channel is after.channel:
+                        text = member.display_name + 'さんが入室しました'
+                        text = text_converter(text)
+                        await mp3_player(text, member.guild.voice_client)
     elif after.channel is None:
         if member.id == client.user.id:
             presence = f'{prefix}ヘルプ | {len(client.voice_clients)}/{len(client.guilds)}サーバー'
             await client.change_presence(activity=discord.Game(name=presence))
         else:
             if member.guild.voice_client:
-                if member.guild.voice_client.channel is before.channel:
-                    if len(member.guild.voice_client.channel.members) == 1:
-                        await asyncio.sleep(0.5)
-                        await member.guild.voice_client.disconnect()
-                    else:
-                        text = member.display_name + 'さんが退室しました'
-                        text = text_converter(text)
-                        await mp3_player(text, member.guild.voice_client)
+                voice_channel = member.guild.voice_client.channel
+                if isinstance(voice_channel, discord.VoiceChannel):
+                    if voice_channel is before.channel:
+                        if len(voice_channel.members) == 1:
+                            await asyncio.sleep(0.5)
+                            await member.guild.voice_client.disconnect(force=False)
+                        else:
+                            text = member.display_name + 'さんが退室しました'
+                            text = text_converter(text)
+                            await mp3_player(text, member.guild.voice_client)
     elif before.channel != after.channel:
         if member.guild.voice_client:
-            if member.guild.voice_client.channel is before.channel:
-                if len(member.guild.voice_client.channel.members) == 1 or member.voice.self_mute:
-                    await asyncio.sleep(0.5)
-                    await member.guild.voice_client.disconnect()
-                    await asyncio.sleep(0.5)
-                    await after.channel.connect()
+            voice_channel = member.guild.voice_client.channel
+            if isinstance(voice_channel, discord.VoiceChannel):
+                if voice_channel is before.channel:
+                    if len(voice_channel.members) == 1 or (member.voice and member.voice.self_mute):
+                        await asyncio.sleep(0.5)
+                        await member.guild.voice_client.disconnect(force=False)
+                        await asyncio.sleep(0.5)
+                        await after.channel.connect()
 
 
 @client.event
