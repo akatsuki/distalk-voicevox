@@ -228,7 +228,7 @@ class EnglishToKana:
             word = match.group().lower()
             if word in self.eng_kana_dic:
                 text = re.sub(
-                    match.group()+r"[\s]*", self.eng_kana_dic[word], text, count=1)
+                    match.group() + r"[\s]*", self.eng_kana_dic[word], text, count=1)
         return text
 
 
